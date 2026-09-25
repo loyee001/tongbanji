@@ -57,18 +57,18 @@ test('XLSX details retain signed unit scores, quantities, totals and old records
   assert.equal(details.get('已撤销多次扣分')[12], '选择错误');
 });
 
-test('summary uses the requested seven columns and sums weekly and semester totals once', async () => {
+test('summary uses the requested six columns and sums weekly and semester totals once', async () => {
   const { workbook } = await exported();
   const summary = workbook.getWorksheet('积分汇总');
-  assert.deepEqual(summary.getRow(3).values.slice(1), ['学号', '姓名', '小组', '本周加分', '本周扣分', '本周累计', '学期累计']);
-  assert.deepEqual(summary.model.merges, ['A1:G1', 'A2:G2']);
-  assert.equal(summary.autoFilter, 'A3:G5');
+  assert.deepEqual(summary.getRow(3).values.slice(1), ['学号', '姓名', '本周加分', '本周扣分', '本周累计', '学期累计']);
+  assert.deepEqual(summary.model.merges, ['A1:F1', 'A2:F2']);
+  assert.equal(summary.autoFilter, 'A3:F5');
   const rows = new Map();
   summary.eachRow((row, index) => { if (index > 3) rows.set(row.getCell(1).value, row.values.slice(1)); });
   assert.deepEqual([...rows.keys()], ['01', '02']);
-  assert.deepEqual(rows.get('01'), ['01', '同学甲', '第一组', 5, 7, -2, 2]);
-  assert.deepEqual(rows.get('02'), ['02', '同学乙', '第一组', 0, 0, 0, 0]);
-  for (const column of ['D', 'E', 'F', 'G']) assert.equal(summary.getCell(`${column}4`).type, ExcelJS.ValueType.Number);
+  assert.deepEqual(rows.get('01'), ['01', '同学甲', 5, 7, -2, 2]);
+  assert.deepEqual(rows.get('02'), ['02', '同学乙', 0, 0, 0, 0]);
+  for (const column of ['C', 'D', 'E', 'F']) assert.equal(summary.getCell(`${column}4`).type, ExcelJS.ValueType.Number);
   const { workbook: summaryOnly } = await exported(fixture(), { details: false });
   assert.deepEqual(summaryOnly.worksheets.map(sheet => sheet.name), ['积分汇总']);
 });
@@ -97,6 +97,39 @@ test('all-student summary sorts numeric student numbers rather than weekly score
   const { result, workbook } = await exported(rankingFixture());
   assert.equal(result.studentCount, 12);
   assert.deepEqual(summaryNumbers(workbook), ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12']);
+});
+
+test('42-student weekly report retains every score in one A4 print area without compressing the detail sheet', async () => {
+  const numbers = Array.from({ length: 42 }, (_, index) => String(index + 1));
+  const data = {
+    name: '全班打印测试', demo: false,
+    students: numbers.toReversed().map(number => ({ id: `student-${number}`, number, name: `同学${number}`, group: '第一组' })),
+    entries: [
+      entry('历史积分', 7, { date: '2026-09-20', studentId: 'student-42' }),
+      entry('末位加分', 3, { studentId: 'student-42' }),
+      entry('末位扣分', -2, { studentId: 'student-42' }),
+    ],
+  };
+  const { result, workbook } = await exported(data);
+  const summary = workbook.getWorksheet('积分汇总');
+  assert.equal(result.studentCount, 42);
+  assert.deepEqual(summaryNumbers(workbook), numbers);
+  assert.equal(summary.rowCount, 45);
+  assert.equal(summary.columnCount, 6);
+  assert.deepEqual(summary.getRow(3).values.slice(1), ['学号', '姓名', '本周加分', '本周扣分', '本周累计', '学期累计']);
+  assert.deepEqual(summary.getRow(45).values.slice(1), ['42', '同学42', 3, 2, 1, 8]);
+  assert.equal(summary.pageSetup.printArea, 'A1:F45');
+  assert.equal(summary.pageSetup.paperSize, 9);
+  assert.equal(summary.pageSetup.orientation, 'portrait');
+  assert.equal(summary.pageSetup.fitToPage, true);
+  assert.equal(summary.pageSetup.fitToWidth, 1);
+  assert.equal(summary.pageSetup.fitToHeight, 1);
+  assert.equal(summary.pageSetup.printTitlesRow, '1:3');
+  const detail = workbook.getWorksheet('加减分明细');
+  assert.equal(detail.pageSetup.orientation, 'landscape');
+  assert.equal(detail.pageSetup.fitToHeight, 0);
+  assert.equal(detail.columnCount, 13);
+  assert.equal(detail.getCell('H5').value, -2);
 });
 
 test('top and bottom scopes select weekly ranks before sorting selected students by number', async () => {
@@ -128,8 +161,8 @@ test('semester total stops at the selected week end and excludes future and revo
   ];
   const { workbook } = await exported(data);
   const summary = workbook.getWorksheet('积分汇总');
-  assert.deepEqual(summary.getRow(4).values.slice(1), ['01', '同学甲', '第一组', 4, 5, -1, 2]);
-  assert.deepEqual(summary.getRow(5).values.slice(1), ['02', '同学乙', '第一组', 0, 0, 0, 0]);
+  assert.deepEqual(summary.getRow(4).values.slice(1), ['01', '同学甲', 4, 5, -1, 2]);
+  assert.deepEqual(summary.getRow(5).values.slice(1), ['02', '同学乙', 0, 0, 0, 0]);
   const titles = [];
   workbook.getWorksheet('加减分明细').eachRow((row, index) => { if (index > 3) titles.push(row.getCell(5).value); });
   assert.deepEqual(titles, ['周首加分', '周中扣分', '周末扣分', '已撤销本周扣分']);
