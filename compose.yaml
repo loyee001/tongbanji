@@ -1,0 +1,49 @@
+name: tongbanji
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    init: true
+    environment:
+      NODE_ENV: production
+      APP_URL: ${APP_URL:?请先运行 bash deploy.sh}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:?请先运行 bash deploy.sh}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?请先运行 bash deploy.sh}
+      DATA_DIR: /app/data
+    volumes:
+      - ./data:/app/data
+      - ./backups:/app/backups
+    expose:
+      - "3000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      start_period: 40s
+      retries: 5
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+  web:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      APP_URL: ${APP_URL:?请先运行 bash deploy.sh}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      app:
+        condition: service_healthy
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+volumes:
+  caddy_data:
+  caddy_config:

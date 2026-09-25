@@ -1,0 +1,31 @@
+[Unit]
+Description=Tongbanji classroom points (isolated deployment)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/tongbanji/.next/standalone
+ExecStart=/opt/tongbanji/runtime/bin/node /opt/tongbanji/.next/standalone/server.js
+EnvironmentFile=/opt/tongbanji/app.env
+Restart=on-failure
+RestartSec=5
+UMask=0077
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=tmpfs
+BindReadOnlyPaths=/opt/tongbanji/sandbox-empty:/root
+BindReadOnlyPaths=/opt/tongbanji/sandbox-empty:/home
+BindReadOnlyPaths=/opt/tongbanji/sandbox-empty:/run/user
+BindReadOnlyPaths=/opt/tongbanji
+ReadWritePaths=/opt/tongbanji/data /opt/tongbanji/backups /opt/tongbanji/.next/standalone/.next/cache
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+InaccessiblePaths=-/run/docker.sock -/run/containerd/containerd.sock -/run/systemd/private -/run/dbus/system_bus_socket
+
+[Install]
+WantedBy=multi-user.target

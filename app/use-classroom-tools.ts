@@ -1,0 +1,15 @@
+'use client';
+import { useEffect, useRef } from 'react';
+import { z } from 'zod';
+import { calculateScores, categories, chinaToday, validDate, type Classroom, type Rule } from '@/lib/classroom';
+type Context={registerTool:(tool:{name:string;title:string;description:string;inputSchema:object;annotations:{readOnlyHint:boolean;untrustedContentHint:boolean};execute:(input:unknown)=>unknown},options:{signal:AbortSignal})=>void|Promise<void>};
+type Props={data:Classroom;week:{start:string;end:string};onStage:(ids:string[],rule:Rule,date:string)=>void};
+const stageSchema=z.object({studentIds:z.array(z.string()).min(1).max(200),title:z.string().trim().min(1).max(80),category:z.string().refine(s=>categories.includes(s)),points:z.number().int().min(-100).max(100).refine(n=>n!==0),date:z.string().refine(d=>validDate(d)&&d<=chinaToday()&&d>='2000-01-01')}).strict();
+export function useClassroomTools(props:Props){
+ const latest=useRef(props);useEffect(()=>{latest.current=props},[props]);
+ useEffect(()=>{const context=(document as Document&{modelContext?:Context}).modelContext;if(!context?.registerTool)return;const lifecycle=new AbortController();
+ const register=(tool:Parameters<Context['registerTool']>[0])=>{try{void Promise.resolve(context.registerTool(tool,{signal:lifecycle.signal})).catch(()=>{})}catch{/* Ordinary browsers remain fully usable. */}};
+ register({name:'get_classroom_scores',title:'读取班级积分',description:'读取当前班级本周或累计积分、学生编号和并列名次；不会修改记录。',inputSchema:{type:'object',properties:{range:{type:'string',enum:['week','all']}},required:['range'],additionalProperties:false},annotations:{readOnlyHint:true,untrustedContentHint:true},execute(input){const {range}=z.object({range:z.enum(['week','all'])}).strict().parse(input);const {data,week}=latest.current;return {className:data.name,demo:data.demo,range,scores:calculateScores(data.students,data.entries,range==='week'?week.start:undefined,range==='week'?week.end:undefined)}}});
+ register({name:'stage_classroom_entry',title:'准备一批加减分登记',description:'选择同学、事项、整数分值和发生日期并显示在登记台。仅准备填写内容，用户点击确认登记后才保存。',inputSchema:{type:'object',properties:{studentIds:{type:'array',items:{type:'string'},minItems:1,maxItems:200},title:{type:'string',minLength:1,maxLength:80},category:{type:'string',enum:categories},points:{type:'integer',minimum:-100,maximum:100,not:{const:0}},date:{type:'string',format:'date'}},required:['studentIds','title','category','points','date'],additionalProperties:false},annotations:{readOnlyHint:false,untrustedContentHint:true},async execute(input){const parsed=stageSchema.parse(input);const ids=[...new Set(parsed.studentIds)];const {data,onStage}=latest.current;if(ids.some(id=>!data.students.some(s=>s.id===id)))throw new Error('存在无效学生编号，未更改登记内容。');onStage(ids,{id:'custom',title:parsed.title,category:parsed.category,points:parsed.points},parsed.date);await new Promise<void>(resolve=>requestAnimationFrame(()=>resolve()));return {status:'staged',studentCount:ids.length,points:parsed.points,date:parsed.date,saved:false}}});
+ return()=>lifecycle.abort();},[]);
+}

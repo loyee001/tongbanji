@@ -1,0 +1,12 @@
+node_modules
+.next
+.git
+.env
+.env.*
+data
+backups
+local-test
+*.tar.gz
+*.tsbuildinfo
+.DS_Store
+tests

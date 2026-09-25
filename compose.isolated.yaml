@@ -1,0 +1,41 @@
+# Dedicated IP deployment: a unique Compose project and one selectable host port.
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    init: true
+    environment:
+      NODE_ENV: production
+      APP_URL: ${APP_URL:?必须配置访问地址}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:?必须配置管理员账号}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?必须配置管理员密码}
+      DATA_DIR: /app/data
+    volumes:
+      - ./data:/app/data
+      - ./backups:/app/backups
+    expose:
+      - "3000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      start_period: 40s
+      retries: 5
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+  web:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "${HTTP_PORT:?必须选择空闲端口}:80"
+    volumes:
+      - ./Caddyfile.ip:/etc/caddy/Caddyfile:ro
+    depends_on:
+      app:
+        condition: service_healthy
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
