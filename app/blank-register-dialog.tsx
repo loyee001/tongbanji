@@ -66,7 +66,7 @@ export default function BlankRegisterDialog({ data, onClose }: Props) {
         </div>
         {data.students.length > previewStudents.length && <p>导出包含全部 {data.students.length} 位同学。</p>}
       </figure>
-      {data.students.length ? <p className="form-note">A4 横向黑白打印，每页最多 {BLANK_REGISTER_PAGE_SIZE} 人，共 {pageCount} 页。每页都有班级、日期和记录员填写栏。打开 Excel 后选择“打印整个工作簿”，即可打印全班空表。</p> : <p className="form-note">班级还没有学生，请先在班级设置中添加名单。</p>}
+      {data.students.length ? <p className="form-note">A4 竖向黑白打印，每页最多 {BLANK_REGISTER_PAGE_SIZE} 人，全班共 {pageCount} 页。每页都有班级、日期和记录员填写栏。打开 Excel 后选择“打印整个工作簿”，即可打印全班空表。</p> : <p className="form-note">班级还没有学生，请先在班级设置中添加名单。</p>}
       <button className="button button-primary" disabled={exporting || !data.students.length} onClick={exportBlankRegister}>
         <Download size={17} />{exporting ? '正在生成…' : '下载登记空表（Excel）'}
       </button>

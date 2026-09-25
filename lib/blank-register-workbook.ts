@@ -1,6 +1,6 @@
 import { validDate, type Classroom } from './classroom';
 
-export const BLANK_REGISTER_PAGE_SIZE = 21;
+export const BLANK_REGISTER_PAGE_SIZE = 42;
 
 type BlankRegisterData = Pick<Classroom, 'name' | 'students' | 'demo'>;
 type BlankRegisterOptions = {date: string};
@@ -35,12 +35,12 @@ export async function makeBlankRegisterWorkbook(data: BlankRegisterData, options
  for (let page = 0; page < pageCount; page++) {
   const pageStudents = students.slice(page * BLANK_REGISTER_PAGE_SIZE, (page + 1) * BLANK_REGISTER_PAGE_SIZE);
   const sheet = workbook.addWorksheet(`登记空表 ${page + 1}`);
-  sheet.columns = [{width: 10}, {width: 24}, {width: 55}, {width: 55}];
+  sheet.columns = [{width: 9}, {width: 14}, {width: 37}, {width: 37}];
   for (const column of sheet.columns) column.numFmt = '@';
   sheet.addRow([title]);
   sheet.mergeCells('A1:D1');
-  sheet.getRow(1).font = {name: '微软雅黑', size: 16, bold: true, color: {argb: 'FF000000'}};
-  sheet.getRow(1).height = Math.max(26, wrappedLines(title, 92) * 20 + 6);
+  sheet.getRow(1).font = {name: '微软雅黑', size: 15, bold: true, color: {argb: 'FF000000'}};
+  sheet.getRow(1).height = Math.max(26, wrappedLines(title, 66) * 18 + 8);
   sheet.getRow(1).alignment = {vertical: 'middle', horizontal: 'center', wrapText: true};
   sheet.addRow([`日期：${dateLabel}    记录员：________________`]);
   sheet.mergeCells('A2:D2');
@@ -54,10 +54,10 @@ export async function makeBlankRegisterWorkbook(data: BlankRegisterData, options
 
   for (const student of pageStudents) {
    const row = sheet.addRow([student.number, student.name, null, null]);
-   row.font = {name: '微软雅黑', size: 11, color: {argb: 'FF000000'}};
+   row.font = {name: '微软雅黑', size: 10, color: {argb: 'FF000000'}};
    row.alignment = {vertical: 'middle', horizontal: 'center', wrapText: true};
-   // Normal rows plus the title, metadata, header and footer fit A4 landscape at 22 pt per student.
-   row.height = Math.max(22, Math.max(wrappedLines(student.number, 8), wrappedLines(student.name, 21)) * 14 + 6);
+   // 42 normal rows plus headings and footer fit portrait A4 at 16 pt per student.
+   row.height = Math.max(16, Math.max(wrappedLines(student.number, 7), wrappedLines(student.name, 12)) * 12 + 4);
    row.getCell(3).alignment = row.getCell(4).alignment = {vertical: 'middle', wrapText: true};
   }
   for (let rowNumber = 3; rowNumber <= 3 + pageStudents.length; rowNumber++) {
@@ -77,7 +77,7 @@ export async function makeBlankRegisterWorkbook(data: BlankRegisterData, options
   footer.height = 16;
   sheet.views = [{state: 'frozen', ySplit: 3, showGridLines: false}];
   sheet.pageSetup = {
-   paperSize: 9, orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 1,
+   paperSize: 9, orientation: 'portrait', fitToPage: true, fitToWidth: 1, fitToHeight: 1,
    blackAndWhite: true, showGridLines: false, horizontalCentered: true,
    margins: {left: 0.3, right: 0.3, top: 0.25, bottom: 0.25, header: 0.1, footer: 0.1},
    printArea: `A1:D${footer.number}`,

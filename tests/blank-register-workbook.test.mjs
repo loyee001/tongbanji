@@ -63,18 +63,18 @@ test('blank register sorts the complete roster naturally without mutation and le
   assert.doesNotMatch(values, /不应导出|9876|积分|名次|排名|小组|合计/);
 });
 
-test('42 and 43 students paginate at 21 per A4 landscape sheet with repeated date, headers and page number', async () => {
-  assert.equal(BLANK_REGISTER_PAGE_SIZE, 21);
+test('42 students fit one A4 portrait page and 43 paginate without losing or duplicating students', async () => {
+  assert.equal(BLANK_REGISTER_PAGE_SIZE, 42);
   for (const count of [42, 43]) {
     const { result, workbook } = await exported({ ...classroom(count), demo: true });
-    const expectedPageCount = count === 42 ? 2 : 3;
+    const expectedPageCount = count === 42 ? 1 : 2;
     assert.equal(result.pageCount, expectedPageCount);
     assert.equal(result.studentCount, count);
     assert.equal(workbook.worksheets.length, expectedPageCount);
     assert.match(result.filename, /_演示\.xlsx$/);
     const exportedNumbers = [];
     workbook.worksheets.forEach((sheet, page) => {
-      const pageSize = Math.min(21, count - page * 21);
+      const pageSize = Math.min(42, count - page * 42);
       assert.equal(sheet.name, `登记空表 ${page + 1}`);
       assert.equal(sheet.rowCount, pageSize + 4);
       assert.equal(sheet.getCell('A1').value, '测试班级 · 每日加减分登记空表（演示）');
@@ -83,19 +83,27 @@ test('42 and 43 students paginate at 21 per A4 landscape sheet with repeated dat
       assert.equal(sheet.getCell(`A${sheet.rowCount}`).value, `第 ${page + 1} / ${expectedPageCount} 页 · 本页 ${pageSize} 人`);
       assert.equal(sheet.columnCount, 4);
       assert.equal(sheet.pageSetup.paperSize, 9);
-      assert.equal(sheet.pageSetup.orientation, 'landscape');
+      assert.equal(sheet.pageSetup.orientation, 'portrait');
       assert.equal(sheet.pageSetup.fitToPage, true);
       assert.equal(sheet.pageSetup.fitToWidth, 1);
       assert.equal(sheet.pageSetup.fitToHeight, 1);
       assert.equal(sheet.pageSetup.blackAndWhite, true);
       assert.equal(sheet.pageSetup.printArea, `A1:D${pageSize + 4}`);
-      assert.equal(sheet.getRow(4).height, 22);
-      for (let row = 4; row < sheet.rowCount; row++) exportedNumbers.push(sheet.getCell(row, 1).value);
+      for (let row = 4; row < sheet.rowCount; row++) {
+        assert.equal(sheet.getRow(row).height, 16);
+        assert.equal(sheet.getRow(row).font.size, 10);
+        exportedNumbers.push(sheet.getCell(row, 1).value);
+        assert.equal(sheet.getCell(row, 3).value, null);
+        assert.equal(sheet.getCell(row, 4).value, null);
+      }
       let contentHeight = 0;
       sheet.eachRow(row => { contentHeight += row.height; });
-      const printableHeight = 210 / 25.4 * 72 - (sheet.pageSetup.margins.top + sheet.pageSetup.margins.bottom) * 72;
-      assert.ok(contentHeight <= printableHeight, 'Standard rows fit the available A4 landscape height');
+      const printableHeight = 297 / 25.4 * 72 - (sheet.pageSetup.margins.top + sheet.pageSetup.margins.bottom) * 72;
+      assert.ok(contentHeight <= printableHeight, 'Standard rows fit the available A4 portrait height');
     });
+    assert.equal(workbook.worksheets[0].getCell('A45').value, '42');
+    assert.equal(workbook.worksheets[0].getCell('B45').value, '测试42');
+    assert.equal(workbook.worksheets[0].pageSetup.printArea, 'A1:D46');
     assert.deepEqual(exportedNumbers, Array.from({ length: count }, (_, index) => String(index + 1)));
   }
 });
@@ -138,7 +146,7 @@ test('formula-looking roster text remains literal and long names wrap without ex
       assert.equal(cell.numFmt, '@');
       assert.equal(cell.alignment.wrapText, true);
     }
-    if (student.name === names[3]) assert.ok(sheet.getRow(row).height > 22);
+    if (student.name === names[3]) assert.ok(sheet.getRow(row).height > 16);
   }
   assert.doesNotMatch(JSON.stringify(sheet.getSheetValues()), /不应导出|9876/);
 });
