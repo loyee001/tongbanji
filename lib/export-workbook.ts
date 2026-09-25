@@ -1,15 +1,15 @@
-import { activeEntries, bottomFive, calculateScores, shiftDate, type Classroom, type Score } from './classroom';
+import { activeEntries, bottomFive, calculateScores, type Classroom, type Score } from './classroom';
 export type ExportOptions={start:string;end:string;scope:'all'|'top'|'bottom';details:boolean};
 export async function makeWorkbook(data:Classroom,options:ExportOptions){
  const {default:ExcelJS}=await import('exceljs');const workbook=new ExcelJS.Workbook();workbook.creator='同班记';workbook.created=new Date();
- const ranked=calculateScores(data.students,data.entries,options.start,options.end);const selected:Score[]=options.scope==='bottom'?bottomFive(ranked):options.scope==='top'?ranked.slice(0,10):ranked;
- const opening=calculateScores(data.students,data.entries,undefined,shiftDate(options.start,-1));const previous=new Map(opening.map(s=>[s.id,s.total]));const studentMap=new Map(data.students.map(s=>[s.id,s]));
+ const ranked=calculateScores(data.students,data.entries,options.start,options.end);const selected:Score[]=(options.scope==='bottom'?bottomFive(ranked):options.scope==='top'?ranked.slice(0,10):ranked).sort((a,b)=>a.number.localeCompare(b.number,'zh-CN',{numeric:true}));
+ const cumulative=new Map(calculateScores(data.students,data.entries,undefined,options.end).map(s=>[s.id,s.total]));const studentMap=new Map(data.students.map(s=>[s.id,s]));
  const title=`${data.name} · 积分周报`;const label=options.scope==='bottom'?'后 5 名（含边界同分）':options.scope==='top'?'前 10 位':'全班';
- const summary=workbook.addWorksheet('积分汇总');summary.columns=[{width:10},{width:12},{width:16},{width:16},{width:12},{width:12},{width:12},{width:14},{width:14}];
- summary.addRow([title]);summary.mergeCells('A1:I1');summary.addRow([`${options.start} 至 ${options.end} · ${label}${data.demo?' · 演示数据':''}`]);summary.mergeCells('A2:I2');summary.addRow(['名次','学号','姓名','小组','期初积分','本期加分','本期扣分','本期净积分','期末积分']);
- for(const row of selected)summary.addRow([row.rank,row.number,row.name,row.group,previous.get(row.id)||0,row.plus,row.minus,row.total,(previous.get(row.id)||0)+row.total]);
- summary.views=[{state:'frozen',ySplit:3}];summary.autoFilter={from:'A3',to:`I${3+selected.length}`};
- summary.getColumn(5).numFmt='0;[Red]-0;0';for(let i=6;i<=9;i++)summary.getColumn(i).numFmt='0;[Red]-0;0';
+ const summary=workbook.addWorksheet('积分汇总');summary.columns=[{width:12},{width:16},{width:16},{width:12},{width:12},{width:14},{width:14}];
+ summary.addRow([title]);summary.mergeCells('A1:G1');summary.addRow([`${options.start} 至 ${options.end} · ${label}${data.demo?' · 演示数据':''}`]);summary.mergeCells('A2:G2');summary.addRow(['学号','姓名','小组','本周加分','本周扣分','本周累计','学期累计']);
+ for(const row of selected)summary.addRow([row.number,row.name,row.group,row.plus,row.minus,row.total,cumulative.get(row.id)||0]);
+ summary.views=[{state:'frozen',ySplit:3}];summary.autoFilter={from:'A3',to:`G${3+selected.length}`};
+ for(let i=4;i<=7;i++)summary.getColumn(i).numFmt='0;[Red]-0;0';
  if(options.details){
   const detail=workbook.addWorksheet('加减分明细');
   detail.columns=[{width:15},{width:12},{width:16},{width:12},{width:32},{width:14},{width:10},{width:14},{width:18},{width:12},{width:28},{width:28},{width:28}];

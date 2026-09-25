@@ -57,15 +57,82 @@ test('XLSX details retain signed unit scores, quantities, totals and old records
   assert.equal(details.get('已撤销多次扣分')[12], '选择错误');
 });
 
-test('summary sums recorded totals once and preserves opening, period and closing balances', async () => {
+test('summary uses the requested seven columns and sums weekly and semester totals once', async () => {
   const { workbook } = await exported();
   const summary = workbook.getWorksheet('积分汇总');
+  assert.deepEqual(summary.getRow(3).values.slice(1), ['学号', '姓名', '小组', '本周加分', '本周扣分', '本周累计', '学期累计']);
+  assert.deepEqual(summary.model.merges, ['A1:G1', 'A2:G2']);
+  assert.equal(summary.autoFilter, 'A3:G5');
   const rows = new Map();
-  summary.eachRow((row, index) => { if (index > 3) rows.set(row.getCell(2).value, row.values.slice(1)); });
-  assert.deepEqual(rows.get('01').slice(4), [4, 5, 7, -2, 2]);
-  assert.deepEqual(rows.get('02').slice(4), [0, 0, 0, 0, 0]);
+  summary.eachRow((row, index) => { if (index > 3) rows.set(row.getCell(1).value, row.values.slice(1)); });
+  assert.deepEqual([...rows.keys()], ['01', '02']);
+  assert.deepEqual(rows.get('01'), ['01', '同学甲', '第一组', 5, 7, -2, 2]);
+  assert.deepEqual(rows.get('02'), ['02', '同学乙', '第一组', 0, 0, 0, 0]);
+  for (const column of ['D', 'E', 'F', 'G']) assert.equal(summary.getCell(`${column}4`).type, ExcelJS.ValueType.Number);
   const { workbook: summaryOnly } = await exported(fixture(), { details: false });
   assert.deepEqual(summaryOnly.worksheets.map(sheet => sheet.name), ['积分汇总']);
+});
+
+function rankingFixture() {
+  const numbers = [10, 2, 12, 1, 11, 3, 9, 6, 4, 8, 5, 7];
+  const weeklyScores = [-10, -9, -1, 0, 1, 1, 3, 4, 5, 6, 7, 8];
+  return {
+    name: '学号排序测试班级', demo: false,
+    students: numbers.map(number => ({ id: `student-${number}`, number: String(number), name: `同学${number}`, group: '第一组' })),
+    entries: [
+      ...numbers.filter(number => weeklyScores[number - 1] !== 0).map(number => entry(`本周-${number}`, weeklyScores[number - 1], { studentId: `student-${number}` })),
+      entry('以往高分', 100, { date: '2026-09-20', studentId: 'student-1' }),
+      entry('以往低分', -100, { date: '2026-09-20', studentId: 'student-12' }),
+    ],
+  };
+}
+
+function summaryNumbers(workbook) {
+  const numbers = [];
+  workbook.getWorksheet('积分汇总').eachRow((row, index) => { if (index > 3) numbers.push(row.getCell(1).value); });
+  return numbers;
+}
+
+test('all-student summary sorts numeric student numbers rather than weekly scores or lexical order', async () => {
+  const { result, workbook } = await exported(rankingFixture());
+  assert.equal(result.studentCount, 12);
+  assert.deepEqual(summaryNumbers(workbook), ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12']);
+});
+
+test('top and bottom scopes select weekly ranks before sorting selected students by number', async () => {
+  for (const [scope, expected] of [
+    ['top', ['3', '4', '5', '6', '7', '8', '9', '10', '11', '12']],
+    ['bottom', ['1', '2', '3', '4', '5', '6']],
+  ]) {
+    const { result, workbook } = await exported(rankingFixture(), { scope });
+    assert.equal(result.studentCount, expected.length);
+    assert.deepEqual(summaryNumbers(workbook), expected);
+    const detailNumbers = new Set();
+    workbook.getWorksheet('加减分明细').eachRow((row, index) => { if (index > 3) detailNumbers.add(row.getCell(2).value); });
+    // Number 4 has zero points and must still appear in the summary despite having no entries.
+    assert.deepEqual([...detailNumbers].sort((a, b) => Number(a) - Number(b)), expected.filter(number => number !== '4'));
+  }
+});
+
+test('semester total stops at the selected week end and excludes future and revoked entries', async () => {
+  const data = fixture();
+  data.entries = [
+    entry('历史加分', 5, { date: '2026-09-01' }),
+    entry('上周扣分', -2, { date: '2026-09-20' }),
+    entry('周首加分', 4, { date: options.start }),
+    entry('周中扣分', -2),
+    entry('周末扣分', -3, { date: options.end }),
+    entry('未来加分', 99, { date: '2026-09-28' }),
+    entry('已撤销历史加分', 30, { date: '2026-09-19', voidedAt: '2026-09-25T02:00:00.000Z', voidReason: '登记错误' }),
+    entry('已撤销本周扣分', -40, { date: options.end, voidedAt: '2026-09-27T02:00:00.000Z', voidReason: '登记错误' }),
+  ];
+  const { workbook } = await exported(data);
+  const summary = workbook.getWorksheet('积分汇总');
+  assert.deepEqual(summary.getRow(4).values.slice(1), ['01', '同学甲', '第一组', 4, 5, -1, 2]);
+  assert.deepEqual(summary.getRow(5).values.slice(1), ['02', '同学乙', '第一组', 0, 0, 0, 0]);
+  const titles = [];
+  workbook.getWorksheet('加减分明细').eachRow((row, index) => { if (index > 3) titles.push(row.getCell(5).value); });
+  assert.deepEqual(titles, ['周首加分', '周中扣分', '周末扣分', '已撤销本周扣分']);
 });
 
 test('expanded detail layout includes all 13 columns in merges, filter, styles and frozen headers', async () => {
