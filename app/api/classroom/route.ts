@@ -2,9 +2,11 @@ import { z } from 'zod';
 import { sameOrigin, saveRecorder } from '@/server/auth';
 export const runtime='nodejs';
 import { database, identity, room, membership, loadClassroom, ApiError } from '@/db/classroom-store';
-import { validDate, chinaToday, categories } from '@/lib/classroom';
+import { validDate, chinaToday, categories, rules } from '@/lib/classroom';
 import { createRecordInputSchema } from '@/lib/record-input';
 import { recordEntries, RecordError } from '@/db/record-entries';
+import { createRuleInputSchema } from '@/lib/rule-input';
+import { defaultClassRuleStatements, mutateClassRule, RuleError } from '@/db/class-rules';
 export const dynamic='force-dynamic';
 const student=z.object({number:z.string().trim().min(1).max(20),name:z.string().trim().min(1).max(30),group:z.string().trim().max(30)}).strict();
 const roster=z.array(student).min(1).max(200).refine(rows=>new Set(rows.map(s=>s.number)).size===rows.length,'学号不能重复');
@@ -12,13 +14,14 @@ const inputSchema=z.union([
  z.object({action:z.literal('create'),name:z.string().trim().min(1).max(40),operator:z.string().trim().min(1).max(30),students:roster}).strict(),
  z.object({action:z.literal('addStudents'),students:roster}).strict(),
  createRecordInputSchema(categories,d=>validDate(d)&&d<=chinaToday()&&d>='2000-01-01'),
+ createRuleInputSchema(categories),
  z.object({action:z.literal('void'),batchId:z.string().min(1).max(100).optional(),entryId:z.string().min(1).max(150).optional(),reason:z.string().trim().min(1).max(120)}).strict().refine(v=>Boolean(v.batchId)!==Boolean(v.entryId)),
  z.object({action:z.literal('settings'),name:z.string().trim().min(1).max(40),operator:z.string().trim().min(1).max(30)}).strict(),
  z.object({action:z.literal('member'),email:z.string().trim().email().max(160),name:z.string().trim().min(1).max(30),password:z.string().min(10).max(128).optional()}).strict(),
  z.object({action:z.literal('removeMember'),email:z.string().trim().email().max(160)}).strict(),
 ]);
 function json(value:unknown,status=200){return Response.json(value,{status,headers:{'Cache-Control':'no-store'}});}
-function failure(error:unknown){if(error instanceof ApiError||error instanceof RecordError)return json({error:error.message},error.status);if(error instanceof z.ZodError)return json({error:'请检查填写内容：学生、单次分值、次数（1–100）和发生日期必须有效。'},400);console.error('Classroom request failed',error);return json({error:'保存服务暂时不可用，填写内容已保留，请稍后重试。'},503);}
+function failure(error:unknown){if(error instanceof ApiError||error instanceof RecordError||error instanceof RuleError)return json({error:error.message},error.status);if(error instanceof z.ZodError)return json({error:'请检查填写内容：学生、分值、次数、日期或公约内容必须有效。'},400);console.error('Classroom request failed',error);return json({error:'保存服务暂时不可用，填写内容已保留，请稍后重试。'},503);}
 export async function GET(){try{return json(await loadClassroom(await identity()));}catch(e){return failure(e)}}
 export async function POST(request:Request){try{
  if(!sameOrigin(request))throw new ApiError(403,'请求来源无效。');
@@ -35,13 +38,16 @@ export async function POST(request:Request){try{
    db.prepare('INSERT OR IGNORE INTO classrooms (id,name,owner_id,created_at) SELECT ?,?,?,? WHERE EXISTS (SELECT 1 FROM batches WHERE id=? AND payload_hash=?)').bind('main',input.name,user.userId,now,'class-initialization',setupToken),
    db.prepare('INSERT OR IGNORE INTO members (email,user_id,name,role) SELECT ?,?,?,? WHERE EXISTS (SELECT 1 FROM classrooms WHERE id=? AND owner_id=?) AND EXISTS (SELECT 1 FROM batches WHERE id=? AND payload_hash=?)').bind(user.email.trim().toLowerCase(),user.userId,input.operator,'owner','main',user.userId,'class-initialization',setupToken),
    db.prepare("INSERT OR IGNORE INTO students (id,class_id,number,name,group_name) SELECT json_extract(value,'$.id'),?,json_extract(value,'$.number'),json_extract(value,'$.name'),json_extract(value,'$.group') FROM json_each(?) WHERE EXISTS (SELECT 1 FROM classrooms WHERE id=? AND owner_id=?) AND EXISTS (SELECT 1 FROM batches WHERE id=? AND payload_hash=?)").bind('main',JSON.stringify(students),'main',user.userId,'class-initialization',setupToken),
+   ...defaultClassRuleStatements(db,'main',rules,now),
   ]);
   return json(await loadClassroom(user),201);
  }
  if(!current)throw new ApiError(409,'请先创建班级并导入真实名单。');
  const member=await membership(user,current);
  if(['addStudents','settings','member','removeMember'].includes(input.action)&&member.role!=='owner')throw new ApiError(403,'这项设置由老师或管理员维护。');
- if(input.action==='record'){
+ if(input.action==='createRule'||input.action==='updateRule'||input.action==='deleteRule'||input.action==='restoreRule'){
+  mutateClassRule(db,input,{classId:current.id,role:member.role,now});
+ }else if(input.action==='record'){
   recordEntries(db,input,{userId:user.userId,operator:member.name,now});
  }else if(input.action==='void'){
   const clause=input.entryId?'id=?':'batch_id=?';const target=input.entryId||input.batchId;

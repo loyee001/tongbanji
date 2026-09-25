@@ -2,21 +2,22 @@
 
 import { ArrowUpRight, Minus, Plus, Pencil, X } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import { rules, signed, type Rule } from '@/lib/classroom';
+import { signed, type Rule } from '@/lib/classroom';
 
 export type DraftItem = { key: string; rule: Rule; quantity: string };
 export function draftKey(rule: Rule) {
- return JSON.stringify([rule.category, rule.title, rule.points]);
+ return JSON.stringify(rule.id === 'custom' ? [rule.id, rule.category, rule.title, rule.points] : [rule.id]);
 }
 
 type Props = {
+ rules: Rule[];
  items: DraftItem[];
  onChange: (items: DraftItem[]) => void;
  onBrowse: () => void;
  onEdit: (key: string) => void;
 };
 
-export default function QuickEntryItems({items, onChange, onBrowse, onEdit}: Props) {
+export default function QuickEntryItems({rules, items, onChange, onBrowse, onEdit}: Props) {
  function toggleRule(rule: Rule) {
   const key = draftKey(rule);
   onChange(items.some(item => item.key === key)

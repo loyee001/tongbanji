@@ -175,7 +175,7 @@ test('migration preserves existing points and audit, and legacy single-item retr
   assert.equal(db.prepare('SELECT COUNT(*) AS n FROM entries').first().n, 2);
   assert.deepEqual(db.prepare('SELECT points,unit_points,quantity,void_reason FROM entries ORDER BY student_id').all().results,
     [1, 2].map(() => ({ points: -2, unit_points: -2, quantity: 1, void_reason: '原有撤销原因' })));
-  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM _tongbanji_migrations').first().n, 3);
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM _tongbanji_migrations').first().n, readdirSync(migrationsSource).filter(name => name.endsWith('.sql')).length);
 });
 
 test('an old single-item request defaults to one occurrence and accepts an explicit quantity', t => {

@@ -4,6 +4,8 @@
 
 快速登记支持多人、多事项，每项独立设置 1–100 次；提交前可修改事项、单次分值、次数、同学与日期。提交结果不确定时锁定原批次重试，避免重复计分。详见 [快速登记说明](docs/quick-entry.md)。
 
+班级公约支持查看、搜索、分类筛选和独立 Excel 导出。管理员可新增、修改、删除及恢复公约；学生记录员可查看、导出并用于登记。修改公约不改变历史积分，详见 [班级公约说明](docs/class-rules.md)。
+
 可选择下方 Docker Compose 部署，或使用 [Node.js + systemd 独立部署](docs/linux-systemd.md)。仓库只包含程序和迁移，不包含任何生产环境凭据或学生数据。
 
 采用 Docker Compose 管理网页服务和反向代理，积分保存在 `data/classroom.sqlite`。不需要另外安装 MySQL、Redis、Node.js，也不需要 ChatGPT 登录。

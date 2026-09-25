@@ -1,4 +1,5 @@
 import { database as sqliteDatabase } from './sqlite';
+import { loadClassRules } from './class-rules';
 import { getChatGPTUser, type ChatGPTUser } from '@/app/chatgpt-auth';
 import type { Student, Entry } from '@/lib/classroom';
 export class ApiError extends Error{constructor(public status:number,message:string){super(message);}}
@@ -22,5 +23,5 @@ export async function loadClassroom(user:ChatGPTUser){
   database().prepare('SELECT e.id,e.batch_id AS batchId,e.student_id AS studentId,e.title,e.category,e.points,e.unit_points AS unitPoints,e.quantity,e.date,e.created_at AS createdAt,e.operator,e.voided_at AS voidedAt,e.void_reason AS voidReason FROM entries e JOIN students s ON s.id=e.student_id WHERE s.class_id = ? ORDER BY e.created_at DESC,e.id DESC').bind('main'),
  ]);
  const roster=member.role==='owner'?await database().prepare('SELECT email,name,role FROM members ORDER BY role,name').all():null;
- return {classroom:{name:current.name,students:results[0].results as unknown as Student[],entries:results[1].results as unknown as Entry[],demo:false,role:member.role,operator:member.name,members:roster?.results||[]},user:{name:member.name,email:user.email}};
+ return {classroom:{...loadClassRules(database(),current.id,member.role),name:current.name,students:results[0].results as unknown as Student[],entries:results[1].results as unknown as Entry[],demo:false,role:member.role,operator:member.name,members:roster?.results||[]},user:{name:member.name,email:user.email}};
 }

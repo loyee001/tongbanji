@@ -1,7 +1,7 @@
 export type Student = { id: string; number: string; name: string; group: string };
-export type Rule = { id: string; category: string; title: string; points: number; note?: string };
+export type Rule = { id: string; category: string; title: string; points: number; note?: string; version?: number };
 export type Entry = { id: string; batchId: string; studentId: string; title: string; category: string; points: number; unitPoints?: number; quantity?: number; date: string; createdAt: string; operator: string; voidedAt: string | null; voidReason?: string };
-export type Classroom = { name: string; students: Student[]; entries: Entry[]; demo: boolean; role?: string; operator?: string; members?: {email:string;name:string;role:string}[] };
+export type Classroom = { name: string; students: Student[]; entries: Entry[]; rules?: Rule[]; deletedRules?: Rule[]; demo: boolean; role?: string; operator?: string; members?: {email:string;name:string;role:string}[] };
 export type Score = Student & { plus: number; minus: number; total: number; rank: number; tied: boolean };
 export const categories = ['出勤','早读','课前','上课','眼操','课间','自习课','作业','卫生','仪容仪表','升旗','路队','其他'];
 export const rules: Rule[] = [
