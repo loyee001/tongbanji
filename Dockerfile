@@ -18,7 +18,7 @@ COPY --from=builder --chown=node:node /app/.next/standalone ./
 COPY --from=builder --chown=node:node /app/.next/static ./.next/static
 COPY --from=builder --chown=node:node /app/public ./public
 COPY --from=builder --chown=node:node /app/drizzle ./drizzle
-COPY --from=builder --chown=node:node /app/scripts/backup.mjs /app/scripts/reset-password.mjs ./scripts/
+COPY --from=builder --chown=node:node /app/scripts/backup.mjs /app/scripts/reset-password.mjs /app/scripts/rename-admin.mjs ./scripts/
 RUN mkdir -p /app/data /app/backups && chown node:node /app/data /app/backups
 USER node
 EXPOSE 3000

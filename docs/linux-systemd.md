@@ -8,7 +8,7 @@
 
 ```dotenv
 APP_URL=http://服务器公网IP:18080
-ADMIN_EMAIL=admin@tongbanji.local
+ADMIN_EMAIL=admin
 ADMIN_PASSWORD=请替换为至少10位的随机密码
 DATA_DIR=/opt/tongbanji/data
 BACKUP_DIR=/opt/tongbanji/backups
@@ -18,7 +18,7 @@ NODE_ENV=production
 NEXT_TELEMETRY_DISABLED=1
 ```
 
-`APP_URL` 必须与浏览器实际访问地址一致。管理员邮箱是本地登录账号，不需要接收邮件。初始密码仅用于空库首次初始化。不要提交真实 `app.env`、`.env`、数据库或备份。
+`APP_URL` 必须与浏览器实际访问地址一致。`ADMIN_EMAIL` 保留原变量名，可设为 `admin` 或邮箱格式的本地登录账号，不需要接收邮件。初始账号和密码仅用于空库首次初始化；已有默认账号的改名步骤见 [管理员账号说明](admin-login.md)。不要提交真实 `app.env`、`.env`、数据库或备份。
 
 ## 构建与启动
 

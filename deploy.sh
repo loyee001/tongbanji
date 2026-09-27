@@ -17,9 +17,9 @@ if [[ ! -f .env ]]; then
   if [[ ! "$server_ip" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then echo '请输入有效 IPv4 地址。'; exit 1; fi
   IFS=. read -r ip1 ip2 ip3 ip4 <<< "$server_ip"
   for octet in "$ip1" "$ip2" "$ip3" "$ip4"; do if (( 10#$octet > 255 )); then echo 'IP 地址无效。'; exit 1; fi; done
-  read -r -p '管理员登录账号 [admin@tongbanji.local]：' admin_email
-  admin_email=${admin_email:-admin@tongbanji.local}
-  if [[ ! "$admin_email" =~ ^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$ ]]; then echo '请使用邮箱格式的登录账号。'; exit 1; fi
+  read -r -p '管理员登录账号 [admin]：' admin_email
+  admin_email=${admin_email:-admin}
+  if [[ "$admin_email" != admin && ! "$admin_email" =~ ^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$ ]]; then echo '请使用 admin 或邮箱格式的登录账号。'; exit 1; fi
   admin_password=$(LC_ALL=C od -An -N16 -tx1 /dev/urandom | tr -d ' \n')
   printf 'APP_URL=http://%s\nADMIN_EMAIL=%s\nADMIN_PASSWORD=%s\n' "$server_ip" "$admin_email" "$admin_password" > .env
   printf '首次管理员账号：%s\n首次管理员密码：%s\n请妥善保存，配置已写入仅当前用户可读的 .env。\n' "$admin_email" "$admin_password"

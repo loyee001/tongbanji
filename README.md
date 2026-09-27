@@ -24,7 +24,7 @@ sudo bash deploy.sh
 
 阿里云安全组需要允许 TCP 80 端口，随后用 `http://服务器公网IP` 打开。80 端口必须未被其他网站占用；如已有网站，先整合现有反向代理。
 
-首次管理员账号默认 `admin@tongbanji.local`，它只是本地登录账号，不需要真实邮箱或收验证码。密码首次启动时显示，并保存在权限为 600 的 `.env` 中。密码不会进入镜像。
+首次管理员账号默认 `admin`，也兼容邮箱格式的本地账号，不需要真实邮箱或收验证码。密码首次启动时显示，并保存在权限为 600 的 `.env` 中。密码不会进入镜像。`ADMIN_EMAIL` 变量名保留兼容，可填 `admin`；修改此变量不会自动重命名已有账号。已有默认账号的改名步骤见 [管理员账号说明](docs/admin-login.md)。
 
 登录后点击“创建我的班级”并粘贴名单，全部积分从 0 开始。管理员在“班级设置 → 学生记录员”中设置最多 2 个账号及各自密码。填写已有账号的新密码会使其旧会话失效。
 
@@ -63,7 +63,7 @@ sudo docker compose exec -T app node scripts/backup.mjs
 sudo docker compose restart
 
 # 重置某个账号密码，并使该账号所有旧会话失效
-sudo docker compose exec -T app node scripts/reset-password.mjs admin@tongbanji.local
+sudo docker compose exec -T app node scripts/reset-password.mjs admin
 ```
 
 备份放在宿主机 `backups/` 中，使用 SQLite 在线备份接口，可包含 WAL 中尚未合并的已提交记录。请定期复制到另一台机器保存。备份包含账号和积分，仅管理员可读。
