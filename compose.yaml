@@ -10,6 +10,7 @@ services:
       ADMIN_EMAIL: ${ADMIN_EMAIL:?请先运行 bash deploy.sh}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:?请先运行 bash deploy.sh}
       DATA_DIR: /app/data
+      DATA_RESET_PASSWORD: ${DATA_RESET_PASSWORD:-00000}
     volumes:
       - ./data:/app/data
       - ./backups:/app/backups

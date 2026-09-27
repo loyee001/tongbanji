@@ -10,6 +10,7 @@ services:
       ADMIN_EMAIL: ${ADMIN_EMAIL:?必须配置管理员账号}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:?必须配置管理员密码}
       DATA_DIR: /app/data
+      DATA_RESET_PASSWORD: ${DATA_RESET_PASSWORD:-00000}
     volumes:
       - ./data:/app/data
       - ./backups:/app/backups

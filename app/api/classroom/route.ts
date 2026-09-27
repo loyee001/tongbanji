@@ -7,6 +7,8 @@ import { createRecordInputSchema } from '@/lib/record-input';
 import { recordEntries, RecordError } from '@/db/record-entries';
 import { createRuleInputSchema } from '@/lib/rule-input';
 import { defaultClassRuleStatements, mutateClassRule, RuleError } from '@/db/class-rules';
+import { clearEntriesInputSchema } from '@/lib/clear-entries-input';
+import { clearEntries, ClearEntriesError } from '@/db/clear-entries';
 export const dynamic='force-dynamic';
 const student=z.object({number:z.string().trim().min(1).max(20),name:z.string().trim().min(1).max(30),group:z.string().trim().max(30)}).strict();
 const roster=z.array(student).min(1).max(200).refine(rows=>new Set(rows.map(s=>s.number)).size===rows.length,'学号不能重复');
@@ -15,13 +17,14 @@ const inputSchema=z.union([
  z.object({action:z.literal('addStudents'),students:roster}).strict(),
  createRecordInputSchema(categories,d=>validDate(d)&&d<=chinaToday()&&d>='2000-01-01'),
  createRuleInputSchema(categories),
+ clearEntriesInputSchema,
  z.object({action:z.literal('void'),batchId:z.string().min(1).max(100).optional(),entryId:z.string().min(1).max(150).optional(),reason:z.string().trim().min(1).max(120)}).strict().refine(v=>Boolean(v.batchId)!==Boolean(v.entryId)),
  z.object({action:z.literal('settings'),name:z.string().trim().min(1).max(40),operator:z.string().trim().min(1).max(30)}).strict(),
  z.object({action:z.literal('member'),email:z.string().trim().email().max(160),name:z.string().trim().min(1).max(30),password:z.string().min(10).max(128).optional()}).strict(),
  z.object({action:z.literal('removeMember'),email:z.string().trim().email().max(160)}).strict(),
 ]);
 function json(value:unknown,status=200){return Response.json(value,{status,headers:{'Cache-Control':'no-store'}});}
-function failure(error:unknown){if(error instanceof ApiError||error instanceof RecordError||error instanceof RuleError)return json({error:error.message},error.status);if(error instanceof z.ZodError)return json({error:'请检查填写内容：学生、分值、次数、日期或公约内容必须有效。'},400);console.error('Classroom request failed',error);return json({error:'保存服务暂时不可用，填写内容已保留，请稍后重试。'},503);}
+function failure(error:unknown){if(error instanceof ApiError||error instanceof RecordError||error instanceof RuleError||error instanceof ClearEntriesError)return json({error:error.message},error.status);if(error instanceof z.ZodError)return json({error:'请检查填写内容：学生、分值、次数、日期、公约内容或清空确认必须有效。'},400);console.error('Classroom request failed',error);return json({error:'保存服务暂时不可用，填写内容已保留，请稍后重试。'},503);}
 export async function GET(){try{return json(await loadClassroom(await identity()));}catch(e){return failure(e)}}
 export async function POST(request:Request){try{
  if(!sameOrigin(request))throw new ApiError(403,'请求来源无效。');
@@ -44,8 +47,10 @@ export async function POST(request:Request){try{
  }
  if(!current)throw new ApiError(409,'请先创建班级并导入真实名单。');
  const member=await membership(user,current);
- if(['addStudents','settings','member','removeMember'].includes(input.action)&&member.role!=='owner')throw new ApiError(403,'这项设置由老师或管理员维护。');
- if(input.action==='createRule'||input.action==='updateRule'||input.action==='deleteRule'||input.action==='restoreRule'){
+ if(['addStudents','settings','member','removeMember','clearEntries'].includes(input.action)&&member.role!=='owner')throw new ApiError(403,'这项设置由老师或管理员维护。');
+ if(input.action==='clearEntries'){
+  await clearEntries(db,input,{classId:current.id,role:member.role});
+ }else if(input.action==='createRule'||input.action==='updateRule'||input.action==='deleteRule'||input.action==='restoreRule'){
   mutateClassRule(db,input,{classId:current.id,role:member.role,now});
  }else if(input.action==='record'){
   recordEntries(db,input,{userId:user.userId,operator:member.name,now});

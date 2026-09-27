@@ -1,5 +1,6 @@
 import { database as sqliteDatabase } from './sqlite';
 import { loadClassRules } from './class-rules';
+import { entriesRevision } from './clear-entries';
 import { getChatGPTUser, type ChatGPTUser } from '@/app/chatgpt-auth';
 import type { Student, Entry } from '@/lib/classroom';
 export class ApiError extends Error{constructor(public status:number,message:string){super(message);}}
@@ -18,10 +19,13 @@ export async function membership(user:ChatGPTUser,current:Room){
 export async function loadClassroom(user:ChatGPTUser){
  const current=await room();if(!current)return {classroom:null,user:{name:user.displayName,email:user.email}};
  const member=await membership(user,current);
- const results=await database().batch([
-  database().prepare('SELECT id,number,name,group_name AS "group" FROM students WHERE class_id = ? ORDER BY number COLLATE NOCASE').bind('main'),
-  database().prepare('SELECT e.id,e.batch_id AS batchId,e.student_id AS studentId,e.title,e.category,e.points,e.unit_points AS unitPoints,e.quantity,e.date,e.created_at AS createdAt,e.operator,e.voided_at AS voidedAt,e.void_reason AS voidReason FROM entries e JOIN students s ON s.id=e.student_id WHERE s.class_id = ? ORDER BY e.created_at DESC,e.id DESC').bind('main'),
- ]);
+ const db=database();
+ // The confirmation revision must describe the same records shown to the administrator.
+ const snapshot=db.transaction(()=>({
+  students:db.prepare('SELECT id,number,name,group_name AS "group" FROM students WHERE class_id = ? ORDER BY number COLLATE NOCASE').bind(current.id).all<Student>().results,
+  entries:db.prepare('SELECT e.id,e.batch_id AS batchId,e.student_id AS studentId,e.title,e.category,e.points,e.unit_points AS unitPoints,e.quantity,e.date,e.created_at AS createdAt,e.operator,e.voided_at AS voidedAt,e.void_reason AS voidReason FROM entries e JOIN students s ON s.id=e.student_id WHERE s.class_id = ? ORDER BY e.created_at DESC,e.id DESC').bind(current.id).all<Entry>().results,
+  ...(member.role==='owner'?{entriesRevision:entriesRevision(db.connection(),current.id)}:{}),
+ }));
  const roster=member.role==='owner'?await database().prepare('SELECT email,name,role FROM members ORDER BY role,name').all():null;
- return {classroom:{...loadClassRules(database(),current.id,member.role),name:current.name,students:results[0].results as unknown as Student[],entries:results[1].results as unknown as Entry[],demo:false,role:member.role,operator:member.name,members:roster?.results||[]},user:{name:member.name,email:user.email}};
+ return {classroom:{...loadClassRules(database(),current.id,member.role),name:current.name,...snapshot,demo:false,role:member.role,operator:member.name,members:roster?.results||[]},user:{name:member.name,email:user.email}};
 }
